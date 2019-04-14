@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+if(@ARGV < 1)
+{
+	warn "Please supply the file names.\n"
+}
+
+our @features;
+our @filenames;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")==-1){
+		push @filenames, $ARGV[$i];
+	}
+}
+our @locations = ("Extracellular","Outer Membrane","Periplasmic","Inner-membrane","Cytoplasmic");
+our @locs;
+
+foreach(@filenames){
+	open FILE, "<$_.pslpred"
+		or die "Could not open $_.pslpred Aborting...\n";
+	while(my $line = <FILE>){
+		chomp $line;
+		my @temp = split /\t/, $line;
+		my $feature = $temp[0];
+		@locs = (0,0,0,0,0);
+		for my $i (0..$#locations){
+			if(index($temp[1],$locations[$i])!=-1){
+				$locs[$i] = 1;
+			}
+		}
+		for my $j (0..$#locs){
+			$feature = $feature.",".$locs[$j];
+		}
+		push @features, $feature;
+	}
+	close FILE;
+	open FINAL, ">$_.csv"
+		or die "Could not create $_.pslpred.csv Aborting...\n";
+	for my $i (0..$#features){
+		print FINAL $features[$i]."\n";
+	}
+	close FINAL;
+	@features = ();
+}

@@ -1,0 +1,97 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+if(@ARGV < 1)
+{
+	warn "Please supply the CELLO2Go file names.\n"
+}
+
+our @filenames;
+our $gram;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")!=-1){
+		if($ARGV[$i] eq "-gramneg"){
+			$gram = -1;
+		}
+		else{
+			$gram = 0;
+		}
+	}
+	else{
+		push @filenames, $ARGV[$i];
+	}
+}
+
+our @features;
+our @locations;
+if($gram == -1){
+	@locations = ("Extracellular","Outermembrane","Periplasmic","Innermembrane","Cytoplasmic");
+}
+else{
+	@locations = ("Extracellular","Cell wall","Membrane","Cytoplasmic");
+}
+our $counter;
+our @locs;
+our $cum_score;
+our @ori_locs;
+
+foreach(@filenames){
+	$counter = 0;
+	if($gram == -1){
+		@locs = (0,0,0,0,0);
+	}
+	else{
+		@locs = (0,0,0,0);
+	}
+	@ori_locs = @locs;
+	$cum_score = 0;
+	open FILE, "<$_"
+		or die "Could not open $_ Aborting...\n";
+	while(my $line = <FILE>){
+		if(index($line, "SQ   ")!=-1){
+			if($counter<1){
+				$counter++;
+			}
+			else{
+				my $feature = "";
+				$cum_score = 1.0/$cum_score;
+				for my $i (0..$#locs){
+					if($locs[$i]>0){
+						$locs[$i] = $cum_score;
+					}
+					$feature = $feature.$locs[$i].",";
+				}
+				push @features, $feature;
+				@locs = @ori_locs;
+				$cum_score = 0;
+			}
+		}
+		elsif(index($line,"CP  ")!=-1){
+			for my $i (0..$#locations){
+				if(index($line,$locations[$i])!=-1){
+					$locs[$i] = 1;
+					$cum_score++;
+				}
+			}
+		}
+	}
+	close FILE;
+	my $feature = "";
+	$cum_score = 1.0/$cum_score;
+	for my $i (0..$#locs){
+		if($locs[$i]>0){
+			$locs[$i] = $cum_score;
+		}
+		$feature = $feature.$locs[$i].",";
+	}
+	push @features, $feature;
+	open FINAL, ">$_.csv"
+		or die "Could not create $_.csv Aborting...\n";
+	for my $i (0..$#features){
+		print FINAL $features[$i]."\n";
+	}
+	close FINAL;
+	@features = ();
+}

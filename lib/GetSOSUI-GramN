@@ -1,0 +1,54 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+if(@ARGV < 1)
+{
+	warn "Please supply the file names.\n"
+}
+
+our @features;
+our @filenames;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")==-1){
+		push @filenames, $ARGV[$i];
+	}
+}
+our @locations = ("unknown","EC","OM","P","IM","C");
+our $counter;
+our @locs;
+our $cum_score;
+
+foreach(@filenames){
+	$counter = 0;
+	$cum_score = 0;
+	open FILE, "<$_"
+		or die "Could not open $_ Aborting...\n";
+	while(my $line = <FILE>){
+		if(index($line,"No.")==-1){
+			my $feature = "";
+			@locs = (0,0,0,0,0);
+			my @temps = split /\t/, $line;
+			if(index($temps[2],$locations[0])==-1){
+				for my $i (1..$#locations){
+					if(index($temps[2],$locations[$i])!=-1){
+						$locs[$i-1] = 1;
+					}
+				}
+			}
+			for my $j (0..$#locs){
+				$feature = $feature.$locs[$j].",";
+			}
+			push @features, $feature;
+		}
+	}
+	close FILE;
+	open FINAL, ">$_.csv"
+		or die "Could not create $_.csv Aborting...\n";
+	for my $i (0..$#features){
+		print FINAL $features[$i]."\n";
+	}
+	close FINAL;
+	@features = ();
+}

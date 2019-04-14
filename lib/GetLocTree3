@@ -1,0 +1,145 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+our @features;
+if(@ARGV < 1)
+{
+	warn "Please supply the LocTree3 file names.\n"
+}
+
+our @filenames;
+our $gram;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")!=-1){
+		if($ARGV[$i] eq "-gramneg"){
+			$gram = -1;
+		}
+		else{
+			$gram = 0;
+		}
+	}
+	else{
+		push @filenames, $ARGV[$i];
+	}
+}
+
+our $original = "gneg_training_data.fasta"; #change this
+our @originals;
+our @sequences;
+our @locs;
+our @locations;
+if($gram == -1){
+	@locations = ("secreted","outer membrane","periplasm","inner membrane","cytoplasm");
+}
+else{
+	@locations = ("secreted", "cell_wall", "inner membrane","cytoplasm");
+}
+our $counter = 0;
+
+#get original headers
+open ORIGIN, "<$original"
+	or die "Could not open $original Aborting...\n";
+while(my $line = <ORIGIN>){
+	my $b = index($line, ">");
+	if($b!=-1){
+		my $end = index($line, " ");
+		my $temp = substr $line, 1, $end-1;
+		push @originals, $temp;
+	}
+}
+close ORIGIN;
+foreach(@filenames){
+	my $flag = 0; #flag is used to separate each sequence. 0 begins search. 1 begins sequence. 2 ends sequence.  
+	my $sequence = "";
+	open TESTING, "<$_.html"
+		or die "$_.html Aborting...\n";
+	while (my $line = <TESTING>){
+		chomp $line;
+		if(index($line, ">Details</a></div>")!=-1){
+			$flag++;
+			if($flag > 1){
+				$flag = 1;
+				push @sequences, $sequence;
+				$sequence = "";
+				$counter = 0;
+			}
+		}
+		else{
+			if(index($line, '<div role="table_cell">')!=-1){
+				my $temp = substr $line, index($line, ">")+1; 
+				if($counter<1){ #row with protein id
+					my $a = index($temp, '">');
+					$temp = substr $temp, $a+2;
+					$a = index($temp,'</a></div>');
+					$temp = substr $temp, 0, $a;
+					$sequence = $sequence.$temp;
+				}
+				elsif($counter==1 or $counter==3){ #row with score or location
+					$temp = substr $temp, 0, index($temp, "<");
+					$sequence = $sequence."\t".$temp;
+				}
+				else{}
+				$counter++;
+			}
+		}
+	}
+	push @sequences, $sequence;
+	$sequence = "";
+	close TESTING;
+	#finish with reading files.
+	for my $j (1..$#sequences){
+		if($gram == -1){
+			@locs = (0,0,0,0,0);
+		}
+		else{
+			@locs = (0,0,0,0);
+		}
+		my @temps = split /\t/, $sequences[$j];
+		my $score = $temps[1];
+		my $feature = $temps[0];
+		for my $k (0..$#locations){
+			if($temps[2] eq $locations[$k]){
+				$locs[$k] = $score;
+				last;
+			}
+		}
+		for my $k (0..$#locs){
+			$feature = $feature."\t".$locs[$k];
+		}
+		push @features, $feature;
+	}
+	@sequences = ();
+	#features are calculated
+}
+my $flag = 0; #this flag will be used to indicate whether it is found or not.
+for my $i (0..$#originals){
+	for my $j (0..$#features){
+		if(index($features[$j],$originals[$i])!=-1){
+			push @sequences, $features[$j];
+			$flag = 1;
+			last;
+		}
+	}
+	if($flag == 0){
+		my $num_tabs;
+		if($gram == -1){
+			$num_tabs = "\t0\t0\t0\t0\t0";
+		}
+		else{
+			$num_tabs = "\t0\t0\t0\t0";
+			push @sequences, $originals[$i].$num_tabs;
+		}
+	}
+	else{
+		$flag = 0;
+	}
+}
+open FINAL, ">$_.csv"
+	or die "Could not create $_.csv Aborting...\n";
+for my $i (0..$#sequences){
+	print FINAL $sequences[$i]."\n";
+}
+close FINAL;
+@features = ();

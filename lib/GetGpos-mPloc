@@ -1,0 +1,61 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+if(@ARGV < 1)
+{
+	warn "Please supply the Gneg-mPloc file names.\n"
+}
+
+our @features;
+our @filenames;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")==-1){
+		push @filenames, $ARGV[$i];
+	}
+}
+our @locations = ("Extracell","Cell wall", "Cell membrane","Cytoplasm");
+our $counter;
+our @originals;
+our $cum_score;
+
+foreach(@filenames){
+	$counter = 0;
+	my @locs = (0,0,0,0);
+	$cum_score = 1;
+	open FILE, "<$_.gposmploc"
+		or die "Could not open $_.gposmploc Aborting...\n";
+	while(my $line = <FILE>){
+		chomp $line;
+		@locs = (0,0,0,0);
+		my @temp = split /\t/, $line;
+		my $feature = $temp[0];
+		my @dots = split ".", $temp[1];
+		if($#dots > 0){
+			$cum_score = 1.0/$#dots;
+		}
+		for my $i (0..$#temp){
+			for my $j (0..$#locations){
+				if(index($temp[$i],$locations[$j])!=-1){
+					$locs[$j] = $cum_score;
+				}
+			}
+		}
+		for my $i (0..$#locs){
+			$feature = $feature.",".$locs[$i];
+		}
+		push @features, $feature;
+		@locs = (0,0,0,0);
+		$cum_score = 1;
+	}
+	close FILE;
+	
+	open FINAL, ">$_.gposmploc.csv"
+		or die "Could not create $_.csv Aborting...\n";
+	for my $i (0..$#features){
+		print FINAL $features[$i]."\n";
+	}
+	close FINAL;
+	@features = ();
+}

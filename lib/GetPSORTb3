@@ -1,0 +1,73 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Scalar::Util qw(looks_like_number);
+
+if(@ARGV < 1)
+{
+	warn "Please supply the PSORTb3 file names.\n"
+}
+
+our @features;
+our @filenames;
+our $gram;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")!=-1){
+		if($ARGV[$i] eq "-gramneg"){
+			$gram = -1;
+		}
+		else{
+			$gram = 0;
+		}
+	}
+	else{
+		push @filenames, $ARGV[$i];
+	}
+}
+our @locations;
+if($gram == -1){
+	@locations = ("EXC","OMB","PER","IMB","CYT");
+}
+else{
+	@locations = ("EXC","WAL","IMB","CYT");
+}
+our $counter;
+our $cum_score;
+our $begin_index;
+our $ending_index;
+
+foreach(@filenames){
+	$counter = 0;
+	$cum_score = 0;
+	open FILE, "<$_"
+		or die "Could not open $_ Aborting...\n";
+	while(my $line = <FILE>){
+		if(index($line,"SeqID	")!=-1){
+			my @temps = split /\t/, $line;
+			for my $i (0..$#temps){
+				if(index($temps[$i],"Cytoplasmic_")!=-1){
+					$ending_index = $i;
+				}
+				if(index($temps[$i],"Extracellular_")!=-1){
+					$begin_index = $i;
+				}
+			}
+		}
+		else{
+			my $feature = "";
+			my @temps = split /\t/, $line;
+			for(my $i = $begin_index; $i>=$ending_index; $i--){
+				$feature = $feature.$temps[$i].",";
+			}
+			push @features, $feature;
+		}
+	}
+	close FILE;
+	open FINAL, ">$_.csv"
+		or die "Could not create $_.csv Aborting...\n";
+	for my $i (0..$#features){
+		print FINAL $features[$i]."\n";
+	}
+	close FINAL;
+	@features = ();
+}
