@@ -1,0 +1,110 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use Cwd;
+
+if(@ARGV < 1)
+{
+	warn "Please supply rarthe file name. (Excluding file extensions)\n";
+}
+
+our @features;
+our @filenames;
+our $gram;
+for my $i (0..$#ARGV){
+	if(index($ARGV[$i],"-gram")!=-1){
+		if($ARGV[$i] eq "-gramneg"){
+			$gram = -1;
+		}
+		else{
+			$gram = 0;
+		}
+	}
+	else{
+		push @filenames, $ARGV[$i];
+	}
+}
+print "Filenames : \n";
+for my $i (0..$#filenames){
+	print $filenames[$i].",";
+}
+print "\n";
+if($gram<0){
+	print "--Gram-negative--\n";
+}
+else{
+	print "--Gram-positive--\n";
+}
+our @program_names;
+open CONFIG, ">configuration.txt"
+	or die "Could not open configuration file. Aborting...\n";
+my $conf_flag = 0; #0 means right configuration not found, 1 means right configuration found
+while(my $line = <CONFIG>){
+	chomp $line;
+	if(index($line,"<Gram->")!=-1){
+		if($gram<0){
+			$conf_flag = 1;
+		}
+		else{
+			$conf_flag = 0;
+		}
+	}
+	elsif(index($line,"<Gram+>")!=-1){
+		if($gram<0){
+			$conf_flag = 0;
+		}
+		else{
+			$conf_flag = 1;
+		}
+	}
+	else{
+		if($conf_flag==1){
+			if(index($line, "#")==-1){ #If there's an # in that line, the program name is not considered.
+				my @temps = split /\t/, $line;
+				push @program_names, $temps[0]
+			}
+		}
+	}
+}
+close CONFIG;
+print "program names: ";
+foreach(@program_names){
+	print $_." ";
+}
+print "\n\nProcessing...\n";
+our $get_path = getcwd();
+#our @program_names = ("CELLO", "PSORTb3", "CELLO2Go","SosuiGramN","SLPLocal","ngLoc");
+
+foreach(@filenames){
+	my $flag = 0;
+	my $status;
+	if($#features>0){
+		$flag = 1;
+	}
+	for my $i (0..$#program_names-1){
+		my $count = 0;
+		$status = system("$get_path/lib/Get".$program_names[$i]." ".$_.".".$program_names[$i]." ".$gram);
+		open CSV, "<$_"."_".$program_names[$i].".csv"
+			or die "Could not read $_".".".$program_names[$i].".csv Aborting...\n";
+		while(my $line = <CSV>){
+			chomp $line;
+			if($count > 0){
+				if($flag == 1){ #if it is not the first program to run,
+					$features[$count] = $features[$count].$line;
+				}
+				else{
+					push @features, $line;
+				}
+			}
+			$count++;
+		}
+		close CSV;
+		$status = system("rm -f $_"."_".$program_names[$i].".csv");
+	}
+	open RESULT, ">$_.csv"
+		or die "Could not create $_.csv Aborting...\n";
+	for my $j (0..$#features){
+		print RESULT $features[$j]."\n";
+	}
+	close RESULT;
+}
